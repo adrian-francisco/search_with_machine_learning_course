@@ -267,6 +267,7 @@ for query in queries:
                 grade = input.rstrip()
                 if grade == "0" or grade == "1":
                     judgment = Judgment(query, hit['_id'], hit['_source']['title'], int(grade))
+                    judgment.query_str = queries[query]
                     judge_vals.append(judgment)
                     break
                 elif grade == "skip" or grade == "s":
