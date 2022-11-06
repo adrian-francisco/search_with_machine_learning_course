@@ -4,26 +4,34 @@
 
     - What precision (P@1) were you able to achieve?
 
+        ```
         $ ~/fastText-0.9.2/fasttext test product_classifier.bin test_data.txt 
         N       9669
         P@1     0.652
         R@1     0.652
+        ```
 
     - What fastText parameters did you use?
 
+        ```
         $ ~/fastText-0.9.2/fasttext supervised -input training_data.txt -output product_classifier -lr 1.0 -epoch 25 -wordNgrams 2
+        ```
 
     - How did you transform the product names?
 
+        ```
         cat /workspace/datasets/fasttext/shuffled_labeled_products.txt |sed -e "s/\([.\!?,'/()]\)/ \1 /g" | tr "[:upper:]" "[:lower:]" | sed "s/[^[:alnum:]_]/ /g" | tr -s ' ' > /workspace/datasets/fasttext/normalized_labeled_products.txt
+        ```
 
     - How did you prune infrequent category labels, and how did that affect your precision?
 
+        ```
         (search_with_ml) gitpod /workspace/search_with_machine_learning_course/week2 (main) $ python pruneLabeledProducts.py 
         Read 0M words
         Number of words:  6719
         Number of labels: 32
         (9967, 0.9699006722183204, 0.9699006722183204)
+        ```
 
     - How did you prune the category tree, and how did that affect your precision?
 
@@ -33,6 +41,7 @@
 
     - What were the results for your best model in the tokens used for evaluation?
 
+        ```
         (search_with_ml) gitpod /workspace/datasets/fasttext $ ~/fastText-0.9.2/fasttext nn title_model.bin 
 
         Query word? headphones
@@ -178,14 +187,19 @@
         curved 0.648482
         theaterseatstore 0.646529
         featherlite 0.640426
+        ```
 
     - What fastText parameters did you use?
 
+        ```
         $ ~/fastText-0.9.2/fasttext skipgram -input normalized_titles.txt -output -output title_model
+        ```
 
     - How did you transform the product names?
 
+        ```
         cat /workspace/datasets/fasttext/titles.txt | sed -e "s/\([.\!?,'/()]\)/ \1 /g" | tr "[:upper:]" "[:lower:]" | sed "s/[^[:alnum:]]/ /g" | tr -s ' ' > /workspace/datasets/fasttext/normalized_titles.txt
+        ```
 
 3. For integrating synonyms with search:
 
@@ -195,7 +209,9 @@
 
     - What threshold score did you use?
 
+        ```
         0.75
+        ```
 
     - Were you able to find the additional results by matching synonyms?
 
