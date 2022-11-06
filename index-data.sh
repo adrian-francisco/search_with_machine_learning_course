@@ -34,7 +34,7 @@ do
 done
 shift $((OPTIND -1))
 
-mkdir $LOGS_DIR
+mkdir -p $LOGS_DIR
 
 cd $PYTHON_LOC || exit
 echo "Running python scripts from $PYTHON_LOC"
