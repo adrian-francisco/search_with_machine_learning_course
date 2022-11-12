@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 import numpy as np
 import csv
+import re
 
 # Useful if you want to perform stemming.
 import nltk
@@ -48,9 +49,35 @@ parents_df = pd.DataFrame(list(zip(categories, parents)), columns =['category', 
 queries_df = pd.read_csv(queries_file_name)[['category', 'query']]
 queries_df = queries_df[queries_df['category'].isin(categories)]
 
-# IMPLEMENT ME: Convert queries to lowercase, and optionally implement other normalization, like stemming.
+# Convert queries to lowercase, normalize spaces and special characters, and stem each word.
+def normalize(query):
+    lowered = query.lower()
+    alphaed = re.sub('[^0-9a-zA-Z]+', ' ', lowered)
+    stemmed = ""
+    for word in alphaed.split():
+        stemmed += stemmer.stem(word) + " "
+    normalized = stemmed.strip()
+    print ("normalize: " + query + " => " + normalized)
+    return normalized
+queries_df['query'] = queries_df['query'].apply(lambda x: normalize(x))
 
-# IMPLEMENT ME: Roll up categories to ancestors to satisfy the minimum number of queries per category.
+# Roll up categories to ancestors to satisfy the minimum number of queries per category.
+done = False
+while not done:
+    done = True
+    for category, count in queries_df['category'].value_counts().items():
+        if count < min_queries:
+            done = False # found at least one, we have to loop again after this
+            parent_category = parents_df.loc[parents_df['category'] == category, 'parent'].item()
+            queries_df.loc[queries_df['category'] == category, 'category'] = parent_category
+            print ("collapse: " + category + " => " + parent_category)
+
+# One final debug output for the categories
+for category, count in queries_df['category'].value_counts().items():
+    print ("category: " + category + ", count: " + str(count))
+
+unique_categories = queries_df['category'].nunique()
+print ("number of unique categories: " + str(unique_categories))
 
 # Create labels in fastText format.
 queries_df['label'] = '__label__' + queries_df['category']

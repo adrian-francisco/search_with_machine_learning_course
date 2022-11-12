@@ -10,6 +10,7 @@ from getpass import getpass
 from urllib.parse import urljoin
 import pandas as pd
 import logging
+import fasttext
 
 
 logger = logging.getLogger(__name__)
@@ -185,16 +186,37 @@ def create_query(user_query, click_prior_query, filters, sort="_score", sortDir=
     return query_obj
 
 
-def search(client, user_query, index="bbuy_products", sort="_score", sortDir="desc", synonyms=False):
-    #### W3: classify the query
-    #### W3: create filters and boosts
+def search(client, model=None, user_query=None, index="bbuy_products", sort="_score", sortDir="desc", synonyms=False):
+    # classify the query, create filters and boosts
+    filters = None
+    if model:
+        labels, probabilities = model.predict(user_query, k=-1)
+        if not labels:
+            print("no labels")
+        else:
+            categories = []
+            total_probability = 0
+            for label, probability in zip(labels, probabilities):
+                print("labeled as:", label, "with probability:", probability)
+                categories.append(label.removeprefix("__label__"))
+                total_probability += probability
+                if total_probability > 0.5:
+                    break
+
+            filters = [
+                {
+                    "match": { "categoryPathIds": " OR ".join(categories) }
+                }
+            ]
+            print("filters:", filters)
+
     # Note: you may also want to modify the `create_query` method above
     if synonyms:
         field = "name.synonyms"
     else:
         field = "name"
     
-    query_obj = create_query(user_query, click_prior_query=None, filters=None, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], field=field)
+    query_obj = create_query(user_query, click_prior_query=None, filters=filters, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], field=field)
     logging.info(query_obj)
     response = client.search(query_obj, index=index)
     if response and response['hits']['hits'] and len(response['hits']['hits']) > 0:
@@ -245,6 +267,7 @@ if __name__ == "__main__":
         ssl_show_warn=False,
 
     )
+    model = fasttext.load_model("/workspace/datasets/fasttext/queries_model.bin")
     index_name = args.index
     query_prompt = "\nEnter your query (type 'Exit' to exit or hit ctrl-c): "
     while True:
@@ -252,4 +275,7 @@ if __name__ == "__main__":
         query = line.rstrip()
         if query.lower() == "exit":
             break
+        print("search without filtering")
         search(client=opensearch, user_query=query, index=index_name, synonyms=synonyms)
+        print("search with filtering")
+        search(client=opensearch, model=model, user_query=query, index=index_name, sort="regularPrice", synonyms=synonyms)
