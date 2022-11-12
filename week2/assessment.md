@@ -1,4 +1,4 @@
-# Assessment
+# Week 2 Project Assessment
 
 1. For classifying product names to categories:
 
