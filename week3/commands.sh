@@ -1,4 +1,4 @@
-shuf /workspace/datasets/fasttext/labeled_queries.txt > /workspace/datasets/fasttext/shuffled_labeled_queries.txt
+shuf /workspace/datasets/fasttext/labeled_queries.txt --random-source=<(seq 999999) > /workspace/datasets/fasttext/shuffled_labeled_queries.txt
 
 head -50000 /workspace/datasets/fasttext/shuffled_labeled_queries.txt > /workspace/datasets/fasttext/training_queries.txt
 tail -10000 /workspace/datasets/fasttext/shuffled_labeled_queries.txt > /workspace/datasets/fasttext/test_queries.txt
