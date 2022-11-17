@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 import pandas as pd
 import logging
 import fasttext
+from sentence_transformers import SentenceTransformer
 
 
 logger = logging.getLogger(__name__)
@@ -186,11 +187,28 @@ def create_query(user_query, click_prior_query, filters, sort="_score", sortDir=
     return query_obj
 
 
-def search(client, model=None, user_query=None, index="bbuy_products", sort="_score", sortDir="desc", synonyms=False):
+def create_vector_query(transformer_model, user_query, size, source):
+    vector = transformer_model.encode([user_query])[0].tolist()
+    query_obj = {
+        "size": size,
+        "query": {
+            "knn": {
+                "embedding": {
+                    "vector": vector,
+                    "k": size
+                }
+            }
+        },
+        "_source": source
+    }
+    return query_obj
+
+
+def search(client, fasttext_model=None, transformer_model=None, user_query=None, size=10, index="bbuy_products", sort="_score", sortDir="desc", synonyms=False, vector=False):
     # classify the query, create filters and boosts
     filters = None
-    if model:
-        labels, probabilities = model.predict(user_query, k=-1)
+    if fasttext_model:
+        labels, probabilities = fasttext_model.predict(user_query, k=-1)
         if not labels:
             print("no labels")
         else:
@@ -216,7 +234,11 @@ def search(client, model=None, user_query=None, index="bbuy_products", sort="_sc
     else:
         field = "name"
     
-    query_obj = create_query(user_query, click_prior_query=None, filters=filters, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], field=field)
+    if vector:
+        query_obj = create_vector_query(transformer_model=transformer_model, user_query=user_query, size=size, source=["name", "shortDescription"])
+    else:
+        query_obj = create_query(user_query, click_prior_query=None, filters=filters, sort=sort, sortDir=sortDir, source=["name", "shortDescription"], field=field)
+
     logging.info(query_obj)
     response = client.search(query_obj, index=index)
     if response and response['hits']['hits'] and len(response['hits']['hits']) > 0:
@@ -240,6 +262,8 @@ if __name__ == "__main__":
                          help='The OpenSearch admin.  If this is set, the program will prompt for password too. If not set, use default of admin/admin')
     general.add_argument('--synonyms',
                          help='True or False. Search using synonyms. Default is False.')
+    general.add_argument('--vector',
+                         help='True or False. Use vector search. Default is False.')
 
     args = parser.parse_args()
 
@@ -253,6 +277,7 @@ if __name__ == "__main__":
         password = getpass()
         auth = (args.user, password)
     synonyms = args.synonyms
+    vector = args.vector
 
     base_url = "https://{}:{}/".format(host, port)
     opensearch = OpenSearch(
@@ -267,7 +292,8 @@ if __name__ == "__main__":
         ssl_show_warn=False,
 
     )
-    model = fasttext.load_model("/workspace/datasets/fasttext/queries_model.bin")
+    fasttext_model = fasttext.load_model("/workspace/datasets/fasttext/queries_model.bin")
+    transformer_model = SentenceTransformer('all-MiniLM-L6-v2')
     index_name = args.index
     query_prompt = "\nEnter your query (type 'Exit' to exit or hit ctrl-c): "
     while True:
@@ -275,7 +301,4 @@ if __name__ == "__main__":
         query = line.rstrip()
         if query.lower() == "exit":
             break
-        print("search without filtering")
-        search(client=opensearch, user_query=query, index=index_name, synonyms=synonyms)
-        print("search with filtering")
-        search(client=opensearch, model=model, user_query=query, index=index_name, sort="regularPrice", synonyms=synonyms)
+        search(client=opensearch, transformer_model=transformer_model, user_query=query, size=3, index=index_name, vector=vector)

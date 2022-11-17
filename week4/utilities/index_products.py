@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logging.basicConfig(format='%(levelname)s:%(message)s')
 
-# IMPLEMENT ME: import the sentence transformers module!
+# import the sentence transformers module!
+from sentence_transformers import SentenceTransformer
 
 # NOTE: this is not a complete list of fields.  If you wish to add more, put in the appropriate XPath expression.
 #TODO: is there a way to do this using XPath/XSL Functions so that we don't have to maintain a big list?
@@ -103,10 +104,17 @@ def get_opensearch():
     )
     return client
 
+def encode(model, names, docs):
+    logger.info("Encoding")
+    embeddings = model.encode(names)
+    for idx, doc in enumerate(docs):
+       doc['embedding'] = embeddings[idx].tolist()
 
 def index_file(file, index_name, reduced=False):
     logger.info("Creating Model")
-    # IMPLEMENT ME: instantiate the sentence transformer model!
+
+    # instantiate the sentence transformer model!
+    model = SentenceTransformer('all-MiniLM-L6-v2')
     
     logger.info("Ready to index")
 
@@ -118,35 +126,45 @@ def index_file(file, index_name, reduced=False):
     children = root.findall("./product")
     docs = []
     names = []
-    # IMPLEMENT ME: maintain the names array parallel to docs,
+    # maintain the names array parallel to docs,
     # and then embed them in bulk and add them to each doc,
     # in the '_source' part of each docs entry, before calling bulk
-    # to index them 200 at a time. Make sure to clear the names array
-    # when you clear the docs array!
+    # to index them 200 at a time.
     for child in children:
         doc = {}
         for idx in range(0, len(mappings), 2):
             xpath_expr = mappings[idx]
             key = mappings[idx + 1]
             doc[key] = child.xpath(xpath_expr)
-        #print(doc)
         if 'productId' not in doc or len(doc['productId']) == 0:
             continue
         if 'name' not in doc or len(doc['name']) == 0:
             continue
         if reduced and ('categoryPath' not in doc or 'Best Buy' not in doc['categoryPath'] or 'Movies & Music' in doc['categoryPath']):
             continue
-        docs.append({'_index': index_name, '_id':doc['sku'][0], '_source' : doc})
-        #docs.append({'_index': index_name, '_source': doc})
+        docs.append(doc)
+        names.append(doc['name'][0])
         docs_indexed += 1
         if docs_indexed % 200 == 0:
+            encode(model, names, docs)
+
             logger.info("Indexing")
-            bulk(client, docs, request_timeout=60)
+            json_docs = []
+            for doc in docs:
+                json_docs.append({'_index': index_name, '_id': doc['sku'][0], '_source': doc})
+            bulk(client, json_docs, request_timeout=60)
             logger.info(f'{docs_indexed} documents indexed')
             docs = []
             names = []
+
     if len(docs) > 0:
-        bulk(client, docs, request_timeout=60)
+        encode(model, names, docs)
+
+        logger.info("Indexing")
+        json_docs = []
+        for doc in docs:
+            json_docs.append({'_index': index_name, '_id': doc['sku'][0], '_source': doc})
+        bulk(client, json_docs, request_timeout=60)
         logger.info(f'{docs_indexed} documents indexed')
     return docs_indexed
 
